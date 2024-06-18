@@ -1,0 +1,652 @@
+---
+title: "Comparative Analysis of Principal Component Regression and Partial Least Squares Regression on Air Quality Data Using R"
+author: "David Heller"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+<br>
+
+## Introduction
+
+In the realm of data science and statistical modeling, handling high-dimensional data with multicollinearity among predictor variables is a common challenge. Traditional regression techniques often struggle in such scenarios, leading to unstable estimates and poor predictive performance. To address these issues, dimensionality reduction techniques such as Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) are employed. This project aims to compare and contrast PCR and PLS, highlighting their strengths and weaknesses through a practical application on the Air Quality Dataset.
+
+#### Principal Component Regression (PCR):
+
+Principal Component Regression is a technique that combines Principal Component Analysis (PCA) and linear regression to address multicollinearity and reduce dimensionality in high-dimensional datasets. The key steps in PCR are:
+
+<ul>
+<li> <b>Principal Component Analysis (PCA)</b>: PCA transforms the original predictor variables into a set of new, uncorrelated variables called principal components. These components are linear combinations of the original variables and are ordered by the amount of variance they explain in the data. Each principal component captures the maximum possible variance while being orthogonal to the previous components. 
+<li> <b>Regression</b>: A subset of the principal components (those explaining the most variance) is selected and used as predictors in a linear regression model to predict the response variable. By focusing on the principal components that capture the most variance, PCR aims to build a more stable and interpretable regression model. 
+<ul>
+
+#### Partial Least Squares Regression (PLS):
+
+Partial Least Squares Regression is a technique that, unlike PCR, considers both the predictor variables and the response variable during the dimensionality reduction process. The key steps in PLS are:
+
+<ul>
+<li> <b>Latent Variable Extraction</b>: PLS extracts a set of latent variables (components) that maximize the covariance between the predictors and the response variable. These components are linear combinations of the original variables, chosen in such a way that they capture as much of the relevant information as possible for predicting the response variable. This ensures that the extracted components are directly related to the outcome of interest. 
+<li> <b>Regression</b>: The latent variables are then used as predictors in a linear regression model to predict the response variable. By incorporating the response variable in the component extraction process, PLS aims to improve the predictive accuracy of the regression model.
+<ul>
+
+#### Project Significance:
+
+This project will provide valuable insights into the practical application of dimensionality reduction techniques in regression modeling. By comparing PCR and PLS, data scientists and researchers can make informed decisions about which method to employ based on the characteristics of their data and the specific requirements of their analysis. Moreover, the findings from this project can contribute to the broader understanding of how to effectively handle multicollinearity and high-dimensional data in various fields, including environmental science, finance, and bioinformatics.
+<br>
+
+### Dataset Overview:
+
+The Air Quality Dataset, sourced from the UCI Machine Learning Repository, contains measurements of various air pollutants and meteorological variables collected at an Italian monitoring station. The dataset comprises daily measurements of pollutants such as ozone, nitrogen dioxide, and carbon monoxide, as well as meteorological variables like temperature, wind speed, and humidity. With over 9,000 instances, this dataset provides a rich source of data for analysis. The target variable for this project will be one of the pollutant concentrations, allowing us to explore how well PCR and PLS can predict air quality based on the available predictors.
+
+<b>Target Variable</b>: C6H6 (benzene) concentration, denoted as C6H6(GT), has been chosen as the target variable due to its significant implications for public health and environmental monitoring. Benzene is a major pollutant, classified as a carcinogen, and its presence in the atmosphere is closely linked to a variety of health risks, including increased cancer rates. Additionally, benzene levels serve as an indicator of vehicular and industrial emissions, which are primary concerns in urban pollution management.
+
+##### Columns:
+
+<ul>
+  <li><b>Date</b>: The date when the measurements were taken.</li>
+  <li><b>Time</b>: The time when the measurements were taken.</li>
+  <li><b>CO(GT)</b>: Concentration of carbon monoxide in the air (measured in mg/m^3).</li>
+  <li><b>PT08.S1(CO)</b>: Sensor response (PPM) of a non-dispersive infrared (NDIR) sensor for carbon monoxide.</li>
+  <li><b>NMHC(GT)</b>: Concentration of non-methane hydrocarbons in the air (measured in microg/m^3).</li>
+  <li><b>C6H6(GT)</b>: Concentration of benzene in the air (measured in microg/m^3).</li>
+  <li><b>PT08.S2(NMHC)</b>: Sensor response (PPM) of an NDIR sensor for non-methane hydrocarbons.</li>
+  <li><b>NOx(GT)</b>: Concentration of nitrogen oxides in the air (measured in PPB).</li>
+  <li><b>PT08.S3(NOx)</b>: Sensor response (PPM) of a chemiluminescence sensor for nitrogen oxides.</li>
+  <li><b>NO2(GT)</b>: Concentration of nitrogen dioxide in the air (measured in microg/m^3).</li>
+  <li><b>PT08.S4(NO2)</b>: Sensor response (PPM) of an electrochemical sensor for nitrogen dioxide.</li>
+  <li><b>PT08.S5(O3)</b>: Sensor response (PPM) of a UV photometric sensor for ozone.</li>
+  <li><b>T</b>: Temperature in Celsius.</li>
+  <li><b>RH</b>: Relative humidity in percentage.</li>
+  <li><b>AH</b>: Absolute humidity in grams per cubic meter.</li>
+</ul>
+<br>
+
+
+#### Libraries
+
+We will start by loading the necessary libraries for our analysis.
+
+```{r message=FALSE, warning=FALSE}
+# Loading the dplyr package for data manipulation
+library(dplyr)
+library(tidyr)
+
+# Loading the ggplot2 and GGally packages for data visualization
+library(ggplot2)
+library(GGally)
+
+# Loading the pls package for Partial Least Squares Regression
+library(pls)
+
+# Loading the caret package for model training and evaluation, including Principal Component Regression
+library(caret)
+
+# Loading the readr package for reading the dataset
+library(readr)
+```
+
+<br>
+
+## Data Loading and Cleaning
+
+```{r message=FALSE}
+# Loading the dataset 
+air_quality <- read_delim("C:/Users/david/Downloads/AirQualityUCI.csv", delim = ";")
+
+# Printing the first few rows of the dataset to inspect it
+head(air_quality)
+```
+
+```{r}
+# Removing the columns with parsing issues
+air_quality <- air_quality %>% select(-c(...16, ...17))
+```
+```{r}
+# Convert character columns to numeric, except for Date and Time
+cols_to_convert <- setdiff(names(air_quality), c("Date", "Time"))
+
+# Use mutate to convert columns to numeric
+air_quality <- air_quality %>%
+  mutate(across(all_of(cols_to_convert), ~ as.numeric(gsub(",", ".", .))))
+
+# Correct the RH column by dividing by 10
+air_quality$RH <- air_quality$RH / 10
+
+# Convert Date to Date type
+air_quality$Date <- as.Date(air_quality$Date, format = "%d/%m/%Y")
+
+# Load 'hms' library to convert Time to hms
+library(hms)
+
+# Replace dots with colons in the Time column
+air_quality$Time <- gsub("\\.", ":", air_quality$Time)
+
+# Convert Time to hms type
+air_quality$Time <- as_hms(air_quality$Time)
+
+# Check the first few rows to confirm the changes
+head(air_quality)
+```
+
+```{r}
+# Check for missing values
+colSums(is.na(air_quality))
+```
+```{r}
+# Replacing invalid values (-200) with NA
+air_quality[air_quality == -200] <- NA
+```
+
+Lets handle the missing values by replacing them with the mean of each column:
+
+```{r}
+# Handle missing values by replacing them with the mean of each column
+air_quality <- air_quality %>%
+  mutate(across(all_of(cols_to_convert), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+```
+
+```{r}
+# Check for missing values
+colSums(is.na(air_quality))
+```
+The missing values in the Date and Time columns remain, but all the other columns have been successfully cleaned. Since Date and Time are not critical for the regression models we are planning to build (PCR and PLS), we can drop these rows with missing Date and Time values.
+
+
+
+```{r}
+# Remove rows with missing values in Date and Time columns
+air_quality <- air_quality %>%
+  filter(!is.na(Date) & !is.na(Time))
+
+# Summary of the cleaned dataset
+summary(air_quality)
+
+# Checking the structure of the cleaned dataset
+str(air_quality)
+
+# Check for missing values
+colSums(is.na(air_quality))
+```
+
+Both Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) are sensitive to outliers, but their sensitivities arise in different ways. In PCR, the sensitivity to outliers stems from the initial Principal Component Analysis (PCA) step, where the method aims to capture the maximum variance in the data. Outliers can significantly affect this variance, distorting the principal components and subsequently leading to poor regression performance. Similarly, PLS involves the construction of latent variables using both predictors and response variables, which means that outliers in either set can bias the results. To mitigate these issues, lets remove the outliers from the data set.
+
+```{r}
+# Identify outliers using the IQR method
+Q1 <- quantile(air_quality$'C6H6(GT)', 0.25)
+Q3 <- quantile(air_quality$'C6H6(GT)', 0.75)
+IQR <- Q3 - Q1
+lower_bound <- Q1 - 1.5 * IQR
+upper_bound <- Q3 + 1.5 * IQR
+outliers <- which(air_quality$'C6H6(GT)' < lower_bound | air_quality$'C6H6(GT)' > upper_bound)
+
+# Remove outliers from the dataset
+air_quality <- air_quality[-outliers, ]
+```
+
+
+```{r}
+# Checking the structure of the cleaned dataset
+str(air_quality)
+```
+<br>
+
+## Data Exploration and Visualization
+
+```{r}
+# Summary of the dataset
+summary(air_quality)
+```
+
+<strong>Brief summary of the key statistics:</strong>
+
+<ul>
+  <li><b>Date</b>: Data ranges from March 10, 2004, to April 4, 2005.</li>
+  <li><b>Time</b>: Time of the measurements, recorded in <code>hms</code> format.</li>
+  <li><b>CO(GT)</b>: Carbon monoxide concentration (mg/m³)
+    <ul>
+      <li>Min: 0.1</li>
+      <li>Median: 2.100</li>
+      <li>Max: 9.3</li>
+    </ul>
+  </li>
+  <li><b>PT08.S1(CO)</b>: Sensor response for CO
+    <ul>
+      <li>Min: 647</li>
+      <li>Median: 1066</li>
+      <li>Max: 1898</li>
+    </ul>
+  </li>
+  <li><b>NMHC(GT)</b>: Non-methane hydrocarbons concentration (μg/m³)
+    <ul>
+      <li>Min: 7.0</li>
+      <li>Median: 218.8</li>
+      <li>Max: 872.0</li>
+    </ul>
+  </li>
+  <li><b>C6H6(GT)</b>: Benzene concentration (μg/m³)
+    <ul>
+      <li>Min: 0.10</li>
+      <li>Median: 8.30</li>
+      <li>Max: 27.10</li>
+    </ul>
+  </li>
+  <li><b>PT08.S2(NMHC)</b>: Sensor response for NMHC
+    <ul>
+      <li>Min: 383</li>
+      <li>Median: 912</li>
+      <li>Max: 1483</li>
+    </ul>
+  </li>
+  <li><b>NOx(GT)</b>: Nitrogen oxides concentration (ppb)
+    <ul>
+      <li>Min: 2.0</li>
+      <li>Median: 220.0</li>
+      <li>Max: 1310.0</li>
+    </ul>
+  </li>
+  <li><b>PT08.S3(NOx)</b>: Sensor response for NOx
+    <ul>
+      <li>Min: 360</li>
+      <li>Median: 826</li>
+      <li>Max: 2683</li>
+    </ul>
+  </li>
+  <li><b>NO2(GT)</b>: Nitrogen dioxide concentration (μg/m³)
+    <ul>
+      <li>Min: 2.0</li>
+      <li>Median: 113.1</li>
+      <li>Max: 340.0</li>
+    </ul>
+  </li>
+  <li><b>PT08.S4(NO2)</b>: Sensor response for NO2
+    <ul>
+      <li>Min: 551</li>
+      <li>Median: 1456</li>
+      <li>Max: 2404</li>
+    </ul>
+  </li>
+  <li><b>PT08.S5(O3)</b>: Sensor response for ozone
+    <ul>
+      <li>Min: 221</li>
+      <li>Median: 968</li>
+      <li>Max: 2519</li>
+    </ul>
+  </li>
+  <li><b>T</b>: Temperature (°C)
+    <ul>
+      <li>Min: -1.90</li>
+      <li>Median: 18.20</li>
+      <li>Max: 44.60</li>
+    </ul>
+  </li>
+  <li><b>RH</b>: Relative humidity (%)
+    <ul>
+      <li>Min: -20.00</li>
+      <li>Median: 48.20</li>
+      <li>Max: 88.70</li>
+    </ul>
+  </li>
+  <li><b>AH</b>: Absolute humidity (g/m³)
+    <ul>
+      <li>Min: 0.1847</li>
+      <li>Median: 1.0115</li>
+      <li>Max: 2.2310</li>
+    </ul>
+  </li>
+</ul>
+
+
+
+Plotting the distributions:
+
+```{r}
+# Converting data to long format and scaling the values
+air_quality_long <- air_quality %>%
+  pivot_longer(cols = -c(Date, Time), names_to = "variable", values_to = "value") %>%
+  mutate(value = scale(value))  # Scale the data
+
+# 1. Histograms of Scaled Data
+ggplot(air_quality_long, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  facet_wrap(~ variable, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Histograms of Scaled Air Quality Variables",
+       x = "Scaled Value",
+       y = "Frequency")
+
+# 2. Box Plots of Scaled Data
+ggplot(air_quality_long, aes(x = variable, y = value)) +
+  geom_boxplot(fill = "blue", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Box Plots of Scaled Air Quality Variables",
+       x = "Variable",
+       y = "Scaled Value")
+```
+
+Checking for correlations:
+```{r}
+# Correlation matrix
+cor_matrix <- cor(air_quality %>% select(-Date, -Time))
+print(cor_matrix)
+```
+<p>Based on the correlation matrix provided, it appears that there is a significant level of multicollinearity among the predictor variables. Key observations:</p>
+
+<ul>
+  <li><strong>High Correlations:</strong>
+    <ul>
+      <li><code>PT08.S1(CO)</code> and <code>PT08.S5(O3)</code> have a correlation of 0.884.</li>
+      <li><code>C6H6(GT)</code> and <code>PT08.S2(NMHC)</code> have a correlation of 0.987.</li>
+      <li><code>C6H6(GT)</code> and <code>PT08.S1(CO)</code> have a correlation of 0.869.</li>
+      <li><code>PT08.S2(NMHC)</code> and <code>PT08.S1(CO)</code> have a correlation of 0.873.</li>
+      <li><code>C6H6(GT)</code> and <code>PT08.S5(O3)</code> have a correlation of 0.853.</li>
+      <li><code>PT08.S2(NMHC)</code> and <code>PT08.S5(O3)</code> have a correlation of 0.860.</li>
+      <li><code>PT08.S4(NO2)</code> and <code>T</code> have a correlation of 0.604.</li>
+      <li><code>AH</code> and <code>T</code> have a correlation of 0.656.</li>
+    </ul>
+  </li>
+  <li><strong>Negative Correlations:</strong>
+    <ul>
+      <li><code>PT08.S3(NOx)</code> and several variables such as <code>PT08.S2(NMHC)</code>, <code>PT08.S1(CO)</code>, and <code>PT08.S5(O3)</code>, indicating a significant negative relationship.</li>
+    </ul>
+  </li>
+</ul>
+
+<p>These high correlation values indicate multicollinearity, where predictor variables are highly correlated with each other. Multicollinearity can be problematic in regression models because it can inflate the variance of the coefficient estimates and make the model coefficients unstable and difficult to interpret. 
+Both PCR and PLS are designed to handle multicollinearity by reducing the dimensionality of the data and summarizing the information from correlated predictors into a smaller set of uncorrelated components</p>
+
+<br>
+
+## Data Preparation for Modeling
+
+```{r}
+# Removing Date and Time columns as they will not be used for modeling
+air_quality <- air_quality %>% select(-Date, -Time) 
+```
+
+```{r}
+# Splitting the data into training and testing sets
+set.seed(123) # For reproducibility
+trainIndex <- createDataPartition(air_quality$`C6H6(GT)`, p = .75, list = FALSE, times = 1) # Create an index for 75% training data
+air_quality_train <- air_quality[trainIndex, ]
+air_quality_test <- air_quality[-trainIndex, ]
+```
+
+When fitting the model we are going to standardize the data. This is crucial because it ensures that all predictor variables contribute equally to the model, irrespective of their original scales or units. Without scaling, variables with larger magnitudes could dominate the model, potentially skewing the results and leading to misleading interpretations. By standardizing variables (giving them zero mean and unit variance), scaling removes these discrepancies, allowing the model to focus on the underlying patterns and relationships in the data. This leads to more reliable and interpretable models, particularly important when dealing with variables of different types and scales.
+
+<br>
+
+## Modeling
+
+### PCR 
+
+```{r}
+# Fitting the PCR model on the training data
+pcr_model <- pcr(`C6H6(GT)` ~ ., data = air_quality_train, scale = TRUE, validation = "CV") # Fit PCR model with cross-validation
+```
+
+The argument validation = "CV" specifies that cross-validation (CV) should be used to validate the model.  Cross-validation is a robust method for assessing the predictive performance of a model. It involves partitioning the data into subsets, training the model on some subsets (training sets), and validating it on the remaining subsets (validation sets). This process is repeated multiple times to ensure the model's performance is consistent and not dependent on a particular partitioning of the data.
+
+By using cross-validation, the model is less likely to overfit to the training data. Overfitting occurs when the model captures noise and specific patterns in the training data that do not generalize to new, unseen data. Cross-validation helps in detecting and mitigating overfitting by testing the model on different subsets of the data.
+
+For PCR and PLS, cross-validation helps in determining the optimal number of components to retain. 
+
+```{r}
+summary(pcr_model)
+```
+
+
+```{r}
+# Plotting the RMSEP (Root Mean Squared Error of Prediction) to find the optimal number of components
+validationplot(pcr_model, val.type = "RMSEP", main = "RMSEP (PCR Model)")
+```
+
+
+<strong>Determining the Optimal Number of Principal Components:</strong>
+
+<p>To determine the optimal number of components, we need to balance between the model complexity (number of components) and the RMSEP (Root Mean Squared Error of Prediction). We are looking for the point where adding more components doesn't significantly improve the prediction accuracy.</p>
+
+<strong>Key Points to Consider from the Summary:</strong>
+
+<strong>RMSEP Values:</strong>
+<ul>
+  <li>There is a significant drop in RMSEP from the intercept to 1 component.</li>
+  <li>The RMSEP continues to decrease gradually until around 3-5 components.</li>
+  <li>After 5 components, the RMSEP starts to plateau, with smaller improvements as more components are added.</li>
+  <li>The RMSEP reaches its minimum at 12 components (0.8308), but we should consider the trade-off between complexity and performance improvement.</li>
+</ul>
+
+<strong>Variance Explained:</strong>
+<ul>
+  <li>The variance explained in the predictors (X) increases rapidly up to 5 components, covering about 90.19% of the variance.</li>
+  <li>The variance explained in the response variable (C6H6(GT)) also shows substantial improvement up to 5 components (91.67%).</li>
+  <li>Beyond 5 components, the additional variance explained in C6H6(GT) increases at a diminishing rate.</li>
+</ul>
+
+Given these points, let's evaluate:
+
+<strong>RMSEP Values:</strong>
+<ul>
+  <li>1 component: 2.213</li>
+  <li>2 components: 2.081</li>
+  <li>3 components: 2.065</li>
+  <li>4 components: 2.054</li>
+  <li>5 components: 1.752</li>
+  <li>6 components: 1.601</li>
+  <li>7-12 components: small improvements</li>
+</ul>
+
+<strong>Variance Explained:</strong>
+<ul>
+  <li>5 components: 91.67%</li>
+  <li>6 components: 93.05% (small improvement)</li>
+</ul>
+
+<p>Based on both RMSEP and variance explained, it seems reasonable to choose around 5-6 components. There is a significant improvement in RMSEP up to 5 components and variance explained in the response variable increases notably up to this point. Beyond 5-6 components, the improvements are minimal.</p>
+
+<p>Therefore, the optimal number of components is <strong>5</strong> or <strong>6</strong>. We might choose 5 for a simpler model or 6 if we prefer slightly better performance at the cost of adding one more component. Let's choose 6 components.</p>
+
+
+
+```{r}
+# Predict using the model and evaluate on the test set with optimal number of components
+optimal_number_of_components <- 6  # Optimal number of components based on the RMSEP plot and summary
+predictions <- predict(pcr_model, ncomp = optimal_number_of_components, newdata = air_quality_test)  
+```
+
+```{r}
+# Compare predictions with actual values
+plot(air_quality_test$`C6H6(GT)`, predictions, xlab = "Actual", ylab = "Predicted", main = "Predicted vs Actual C6H6(GT) Values (PCR Model)")  # Plot actual vs predicted values
+abline(0, 1)  # Add a diagonal line for reference
+```
+
+#### Evaluating PCR model
+
+The square root of the Mean Squared Error provides an indication of the average magnitude of the errors in the same units as the response variable. Lower RMSE values indicate better model performance. 
+
+R-squared represents the proportion of the variance in the dependent variable that is predictable from the independent variables. Values closer to 1 indicate better model performance.
+
+
+```{r}
+# Calculate and print the Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((air_quality_test$`C6H6(GT)` - predictions)^2))  # Calculate RMSE between actual and predicted values
+print(paste("RMSE: ", rmse)) 
+```
+
+```{r}
+# Calculate the sum of squares of residuals
+ss_res <- sum((air_quality_test$`C6H6(GT)` - predictions)^2)
+
+# Calculate the total sum of squares
+ss_tot <- sum((air_quality_test$`C6H6(GT)` - mean(air_quality_test$`C6H6(GT)`))^2)
+
+# Calculate R-squared
+r_squared <- 1 - (ss_res / ss_tot)
+
+# Print R-squared
+print(paste("R-squared: ", r_squared))
+```
+An R-squared value of 0.9331 means that approximately 93.31% of the variance in the dependent variable (C6H6 concentration) can be explained by the independent variables in the model. This indicates a very strong relationship between the predictors and the response variable.
+This value suggests that the model fits the data very well and that the predictors used in the model are good at explaining the variability in the response variable.
+
+### PLS
+
+```{r}
+# Fitting the PLS model on the training data
+pls_model <- plsr(`C6H6(GT)` ~ ., data = air_quality_train, scale = TRUE, validation = "CV")
+
+summary(pls_model)
+```
+```{r}
+# Plotting the RMSEP (Root Mean Squared Error of Prediction) to find the optimal number of components
+validationplot(pls_model, val.type = "RMSEP", main = "RMSEP (PLS Model)")
+```
+
+<strong>Determining the Optimal Number of Components:</strong>
+
+<p>To determine the optimal number of components, we need to balance between the model complexity (number of components) and the RMSEP (Root Mean Squared Error of Prediction). We are looking for the point where adding more components doesn't significantly improve the prediction accuracy.</p>
+
+<strong>Key Points to Consider from the Summary:</strong>
+
+<strong>RMSEP Values:</strong>
+<ul>
+  <li>There is a significant drop in RMSEP from the intercept to 1 component.</li>
+  <li>The RMSEP continues to decrease gradually until around 3-5 components.</li>
+  <li>After 5 components, the RMSEP starts to plateau, with smaller improvements as more components are added.</li>
+  <li>The RMSEP reaches its minimum at 12 components (0.8303), but we should consider the trade-off between complexity and performance improvement.</li>
+</ul>
+
+<strong>Variance Explained:</strong>
+<ul>
+  <li>The variance explained in the predictors (X) increases rapidly up to 5 components, covering about 83.87% of the variance.</li>
+  <li>The variance explained in the response variable (C6H6(GT)) also shows substantial improvement up to 5 components (97.22%).</li>
+  <li>Beyond 5 components, the additional variance explained in C6H6(GT) increases at a diminishing rate.</li>
+</ul>
+
+<strong>Given these points, let's evaluate:</strong>
+
+<strong>RMSEP Values:</strong>
+<ul>
+  <li>1 component: 2.032</li>
+  <li>2 components: 1.711</li>
+  <li>3 components: 1.359</li>
+  <li>4 components: 1.225</li>
+  <li>5 components: 1.014</li>
+  <li>6 components: 0.967</li>
+  <li>7-12 components: small improvements</li>
+</ul>
+
+<strong>Variance Explained:</strong>
+<ul>
+  <li>5 components: 97.22%</li>
+  <li>6 components: 97.46% (small improvement)</li>
+</ul>
+
+<p>Based on both RMSEP and variance explained, it seems reasonable to choose around 5-6 components. There is a significant improvement in RMSEP up to 5 components and variance explained in the response variable increases notably up to this point. Beyond 5-6 components, the improvements are minimal.</p>
+
+<p>Therefore, the optimal number of components is <strong>5</strong> or <strong>6</strong>. We might choose 5 for a simpler model or 6 if we prefer slightly better performance at the cost of adding one more component. Let's choose 6 components.</p>
+
+
+```{r}
+# Predict using the model and evaluate on the test set with optimal number of components
+optimal_number_of_components <- 6  # Optimal number of components based on the RMSEP plot and summary
+predictions2 <- predict(pls_model, ncomp = optimal_number_of_components, newdata = air_quality_test)  
+```
+
+```{r}
+# Compare predictions with actual values
+plot(air_quality_test$`C6H6(GT)`, predictions2, xlab = "Actual", ylab = "Predicted", main = "Predicted vs Actual C6H6(GT) Values (PLS Model)")  # Plot actual vs predicted values
+abline(0, 1)  # Add a diagonal line for reference
+```
+
+#### Evaluating PLS model
+
+```{r}
+# Calculate and print the Root Mean Squared Error (RMSE)
+rmse2 <- sqrt(mean((air_quality_test$`C6H6(GT)` - predictions2)^2))  # Calculate RMSE between actual and predicted values
+print(paste("RMSE: ", rmse2)) 
+```
+```{r}
+# Calculate the sum of squares of residuals
+ss_res2 <- sum((air_quality_test$`C6H6(GT)` - predictions2)^2)
+
+# Calculate the total sum of squares
+ss_tot2 <- sum((air_quality_test$`C6H6(GT)` - mean(air_quality_test$`C6H6(GT)`))^2)
+
+# Calculate R-squared
+r_squared2 <- 1 - (ss_res2 / ss_tot2)
+
+# Print R-squared
+print(paste("R-squared: ", r_squared2))
+```
+An R-squared value of 0.9744 means that approximately 97.44% of the variance in the C6H6(GT) values can be explained by the predictors included in the Partial Least Squares (PLS) model. This value is very high, indicating an excellent fit to the data.
+
+<br>
+
+## Comparing the Models 
+
+#### Model Performance Metrics
+
+##### Root Mean Squared Error (RMSE)
+- **PCR RMSE:** 1.572
+- **PLS RMSE:** 0.972
+
+The RMSE evaluates the average magnitude of the errors between predicted and actual values. The significantly lower RMSE of the PLS model indicates its superior accuracy in predicting the concentrations of C6H6(GT), highlighting its effectiveness in practical applications where precise predictions are vital.
+
+##### R-squared
+- **PCR R-squared:** 0.9331
+- **PLS R-squared:** 0.9744
+
+R-squared measures the proportion of variance in the dependent variable that is predictable from the independent variables. The higher R-squared of the PLS model shows that it captures a greater extent of the variability in benzene levels, suggesting a better overall fit to the data.
+
+#### Model Complexity and Component Analysis
+
+Both models show optimal performance with about 5-6 components based on RMSEP and variance explained. This similarity in dimensionality masks significant differences in how each model processes and utilizes these components:
+
+- **PCR:** Focuses on capturing the maximum variance within the predictors. It is effective for dimensionality reduction and uncovering the structure in high-dimensional data. However, the main limitation is that the components with the highest variance in predictors might not be the most relevant for predicting the response variable.
+- **PLS:** Aims to maximize the covariance between the predictors and the response variable. This method not only reduces dimensionality but ensures that the retained components are directly relevant to the outcome of interest. The strength of PLS lies in its ability to identify the components that are most predictive of the response, making it highly suitable for prediction-focused studies.
+
+#### Strategic Evaluation of Model Choice
+
+##### PCR: Strengths and Weaknesses
+- **Strengths:**
+  - Excellent for exploratory data analysis and understanding the underlying structure of the data.
+  - Effective in situations where understanding the variance structure within the predictors is more important than predicting a specific outcome.
+- **Weaknesses:**
+  - May overlook the relationship between predictors and the response variable.
+  - Not ideal for predictive modeling when the goal is to minimize prediction error.
+
+##### PLS: Strengths and Weaknesses
+- **Strengths:**
+  - Directly targets variance most predictive of the response variable, enhancing predictive accuracy.
+  - Highly effective in handling collinear data, making it ideal for complex datasets where predictors are interrelated.
+- **Weaknesses:**
+  - Can be more complex to interpret compared to PCR because the components are optimized for prediction rather than variance explanation.
+  - Less intuitive for purely exploratory analysis as it focuses on the prediction.
+
+<br>
+
+## Conclusions and Recommendations
+
+Our comprehensive analysis clearly demonstrates that PLS generally provides superior predictive performance for our dataset, particularly because it focuses on the covariance between predictors and the response variable. This makes PLS exceptionally valuable for our goal of accurate and reliable air quality prediction, crucial for formulating effective public health responses.
+
+<strong> When to Prefer PLS </strong>
+
+<ul>
+  <li>Opt for PLS when high predictive accuracy is needed, especially in complex datasets where predictors are highly collinear.</li>
+  <li>Suitable when the focus is on capturing and modeling the underlying relationships directly affecting the target variable.</li>
+</ul>
+
+<strong> When to Prefer PCR </strong>
+
+<ul>
+  <li>Favor PCR when the primary interest is in reducing dimensionality and understanding the variance within the predictors, independent of their impact on the response variable.</li>
+  <li>More suited for exploratory analyses aimed at uncovering hidden structures in the data, which may not necessarily link directly to the target variable.</li>
+</ul>
+
+In summary, for tasks where forecasting is critical, such as policy adjustments for air quality management, PLS is the more suitable choice. However, PCR remains advantageous for exploratory tasks or when the primary goal is to understand the internal variance structure without a direct link to a specific response. 
+
+This project has demonstrated the practical application of PCR and PLS in handling high-dimensional, multicollinear datasets for environmental monitoring. By providing a clear comparison of their strengths and weaknesses, it equips data scientists and researchers with the knowledge to make informed decisions based on their specific analytical goals. The insights gained from this analysis underscore the importance of selecting the right modeling technique to achieve accurate, reliable, and interpretable results in predictive modeling.
