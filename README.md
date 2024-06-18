@@ -3,6 +3,15 @@
 <h2>Overview</h2>
 <p>This project provides a comparative analysis of Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) for predicting benzene (C6H6) concentrations using the Air Quality Dataset from the UCI Machine Learning Repository. The dataset contains measurements of various air pollutants and meteorological variables collected from an Italian monitoring station. The primary goal is to address multicollinearity and dimensionality reduction to improve predictive accuracy.</p>
 
+<h2>Tools and Libraries</h2>
+<ul>
+  <li><strong>Data Manipulation</strong>: dplyr, tidyr</li>
+  <li><strong>Data Visualization</strong>: ggplot2, GGally</li>
+  <li><strong>Modeling</strong>: pls, caret</li>
+  <li><strong>Data Reading</strong>: readr</li>
+  <li><strong>Time Handling</strong>: hms</li>
+</ul>
+
 <h2>Dataset</h2>
 <p>The Air Quality Dataset includes:</p>
 <ul>
@@ -52,21 +61,4 @@
 <ul>
   <li><strong>PLS</strong>: Recommended for predictive modeling due to its higher accuracy in predicting benzene concentrations.</li>
   <li><strong>PCR</strong>: Useful for exploratory data analysis and understanding the variance structure within predictors.</li>
-</ul>
-
-<h2>Tools and Libraries</h2>
-<ul>
-  <li><strong>Data Manipulation</strong>: dplyr, tidyr</li>
-  <li><strong>Data Visualization</strong>: ggplot2, GGally</li>
-  <li><strong>Modeling</strong>: pls, caret</li>
-  <li><strong>Data Reading</strong>: readr</li>
-  <li><strong>Time Handling</strong>: hms</li>
-</ul>
-
-<h2>Project Structure</h2>
-<ul>
-  <li><strong>Data</strong>: Contains the dataset and any preprocessing scripts.</li>
-  <li><strong>Scripts</strong>: Includes R scripts for data cleaning, EDA, modeling, and evaluation.</li>
-  <li><strong>Results</strong>: Stores the results of the analyses, including visualizations and model performance metrics.</li>
-  <li><strong>README</strong>: Comprehensive project overview and instructions.</li>
 </ul>
