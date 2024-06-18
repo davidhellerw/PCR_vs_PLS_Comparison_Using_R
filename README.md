@@ -1,4 +1,4 @@
-<h1>Comparative Analysis of Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) on Air Quality Data</h1>
+<h1>Comparative Analysis of Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) on Air Quality Data Using R</h1>
 
 <h2>Overview</h2>
 <p>This project provides a comparative analysis of Principal Component Regression (PCR) and Partial Least Squares Regression (PLS) for predicting benzene (C6H6) concentrations using the Air Quality Dataset from the UCI Machine Learning Repository. The dataset contains measurements of various air pollutants and meteorological variables collected from an Italian monitoring station. The primary goal is to address multicollinearity and dimensionality reduction to improve predictive accuracy.</p>
